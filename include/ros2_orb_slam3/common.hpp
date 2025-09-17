@@ -42,7 +42,7 @@ using std::placeholders::_1; //* TODO why this is suggested in official tutorial
 #include <opencv2/highgui/highgui.hpp> // GUI tools
 #include <opencv2/core/eigen.hpp>
 #include <image_transport/image_transport.h>
-
+#include "ament_index_cpp/get_package_share_directory.hpp"
 //* ORB SLAM 3 includes
 #include "System.h" //* Also imports the ORB_SLAM3 namespace
 
@@ -69,7 +69,7 @@ class MonocularMode : public rclcpp::Node
         
         // Class internal variables
         std::string homeDir = "";
-        std::string packagePath = "ros2_test/src/ros2_orb_slam3/"; //! Change to match path to your workspace
+        std::string packagePath = ament_index_cpp::get_package_share_directory("ros2_orb_slam3"); //! Change to match path to your workspace
         std::string OPENCV_WINDOW = ""; // Set during initialization
         std::string nodeName = ""; // Name of this node
         std::string vocFilePath = ""; // Path to ORB vocabulary provided by DBoW2 package

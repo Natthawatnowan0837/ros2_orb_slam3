@@ -196,6 +196,10 @@ install(PROGRAMS
   scripts/mono_driver_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
+install(
+  DIRECTORY orb_slam3/
+  DESTINATION share/${PROJECT_NAME}/orb_slam3
+)
 
 
 ament_package()
