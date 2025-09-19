@@ -4,8 +4,9 @@ import time
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image, Imu
-from std_msgs.msg import String, Float64, Float64MultiArray
+from std_msgs.msg import String, Float64
 from cv_bridge import CvBridge
+
 
 class MonoDriver(Node):
     def __init__(self, node_name="mono_py_node"):
@@ -16,22 +17,24 @@ class MonoDriver(Node):
 
         # ===== Handshake variables =====
         self.send_config = True
-        self.exp_config_msg = "EuRoC"   # เปลี่ยนชื่อ config ที่ต้องการ เช่น "EuRoC", "TUM2"
+        self.exp_config_msg = "EuRoC"   
         self.publish_exp_config_ = self.create_publisher(String, "/mono_py_driver/experiment_settings", 1)
-        self.subscribe_exp_ack_ = self.create_subscription(String, "/mono_py_driver/exp_settings_ack", self.ack_callback, 10)
+        self.subscribe_exp_ack_ = self.create_subscription(
+            String, "/mono_py_driver/exp_settings_ack", self.ack_callback, 10
+        )
 
         # ===== Forward publishers =====
         self.pub_img_to_agent = self.create_publisher(Image, "/mono_py_driver/img_msg", 1)
+        self.pub_depth_to_agent = self.create_publisher(Image, "/mono_py_driver/depth_msg", 1)
+        self.pub_imu_to_agent = self.create_publisher(Imu, "/mono_py_driver/imu_raw", 100)
         self.pub_timestep_to_agent = self.create_publisher(Float64, "/mono_py_driver/timestep_msg", 1)
-        self.pub_gyro_to_agent = self.create_publisher(Float64MultiArray, "/mono_py_driver/imu_gyro", 10)
-        self.pub_accel_to_agent = self.create_publisher(Float64MultiArray, "/mono_py_driver/imu_accel", 10)
 
         # ===== Subscribers จากกล้อง =====
         self.create_subscription(Image, "/camera/camera/color/image_raw", self.camera_callback, 10)
-        self.create_subscription(Imu, "/camera/camera/gyro/sample", self.gyro_callback, 50)
-        self.create_subscription(Imu, "/camera/camera/accel/sample", self.accel_callback, 50)
+        self.create_subscription(Image, "/camera/camera/depth/image_rect_raw", self.depth_callback, 10)
+        self.create_subscription(Imu, "/camera/camera/imu", self.imu_callback, 200)
 
-        self.get_logger().info("MonoDriver listening to camera + IMU topics")
+        self.get_logger().info("MonoDriver listening to camera RGB + Depth + IMU topics")
 
     # ---------------------------------------------------------------------------------
     def ack_callback(self, msg: String):
@@ -51,7 +54,7 @@ class MonoDriver(Node):
 
     # ---------------------------------------------------------------------------------
     def camera_callback(self, msg: Image):
-        """รับภาพจากกล้องแล้ว forward ไปยัง C++ node"""
+        """รับภาพ RGB แล้ว forward ไปยัง C++ node"""
         try:
             timestep_msg = Float64()
             timestep_msg.data = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
@@ -59,33 +62,23 @@ class MonoDriver(Node):
             self.pub_timestep_to_agent.publish(timestep_msg)
             self.pub_img_to_agent.publish(msg)
 
-            self.get_logger().info(f"Forwarded image frame at {timestep_msg.data:.6f}")
+            self.get_logger().info(f"Forwarded RGB frame at {timestep_msg.data:.6f}")
         except Exception as e:
-            self.get_logger().error(f"Error forwarding image: {e}")
+            self.get_logger().error(f"Error forwarding RGB: {e}")
 
     # ---------------------------------------------------------------------------------
-    def gyro_callback(self, msg: Imu):
-        """รับ gyro data แล้ว forward"""
-        arr = Float64MultiArray()
-        arr.data = [
-            msg.angular_velocity.x,
-            msg.angular_velocity.y,
-            msg.angular_velocity.z
-        ]
-        self.pub_gyro_to_agent.publish(arr)
-        # self.get_logger().info(f"Gyro: {arr.data}")
+    def depth_callback(self, msg: Image):
+        """รับ depth image แล้ว forward"""
+        try:
+            self.pub_depth_to_agent.publish(msg)
+        except Exception as e:
+            self.get_logger().error(f"Error forwarding depth: {e}")
 
     # ---------------------------------------------------------------------------------
-    def accel_callback(self, msg: Imu):
-        """รับ accel data แล้ว forward"""
-        arr = Float64MultiArray()
-        arr.data = [
-            msg.linear_acceleration.x,
-            msg.linear_acceleration.y,
-            msg.linear_acceleration.z
-        ]
-        self.pub_accel_to_agent.publish(arr)
-        # self.get_logger().info(f"Accel: {arr.data}")
+    def imu_callback(self, msg: Imu):
+        """รับ IMU แล้ว forward"""
+        self.pub_imu_to_agent.publish(msg)
+
 
 # ---------------------------------------------------------------------------------
 def main(args=None):
@@ -97,7 +90,7 @@ def main(args=None):
         node.handshake_with_cpp_node()
         rclpy.spin_once(node, timeout_sec=0.1)
 
-    node.get_logger().info("Handshake complete, now forwarding camera + IMU frames...")
+    node.get_logger().info("Handshake complete, now forwarding RGB + Depth + IMU frames...")
 
     # ===== Main spin =====
     try:
@@ -107,6 +100,7 @@ def main(args=None):
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()

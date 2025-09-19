@@ -26,6 +26,8 @@
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/bool.hpp>
 #include "sensor_msgs/msg/image.hpp"
+#include <sensor_msgs/msg/point_cloud2.hpp>
+
 using std::placeholders::_1; //* TODO why this is suggested in official tutorial
 
 // Include Eigen
@@ -80,6 +82,8 @@ class MonocularMode : public rclcpp::Node
         std::string pubconfigackName = ""; // Publisher topic name
         std::string subImgMsgName = ""; // Topic to subscribe to receive RGB images from a python node
         std::string subTimestepMsgName = ""; // Topic to subscribe to receive the timestep related to the 
+
+        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pointcloud_pub_;
 
         //* Definitions of publisher and subscribers
         rclcpp::Subscription<std_msgs::msg::String>::SharedPtr expConfig_subscription_;
